@@ -28,35 +28,15 @@ object DonutBitmapRenderer {
         val lastMonth = energyMonthLabel(today.withDayOfMonth(1).minusMonths(1))
         val thisMonth = energyMonthLabel(today)
 
-        // Previous drawn sizes were column * 0.315 (title) and * 0.255 (usage).
-        // 20% smaller, measured against the one-cell bitmap, is 0.204 and 0.186.
-        val baseCol = w / count.toFloat()
-        var colW = baseCol
-        var energySize = baseCol * 0.186f
-        var titleSize = baseCol * 0.204f
-        fun fitToColumns() {
-            val maxText = colW * 0.96f
-            energySize = baseCol * 0.186f
-            titleSize = baseCol * 0.204f
-            cycles.forEach { cycle ->
-                energySize = minOf(
-                    energySize,
-                    sizeThatFits(formatKwh(cycle.lastMonthWh), energySize, maxText, bold = false),
-                    sizeThatFits(formatKwh(cycle.thisMonthWh), energySize, maxText, bold = false),
-                )
-                titleSize = minOf(
-                    titleSize,
-                    sizeThatFits(cycle.role.title, titleSize, maxText, bold = true),
-                )
-            }
+        val measured = measureColumns(cycles, w.toFloat(), count, lastMonth, thisMonth)
+        // A short widget cannot keep a readable donut, the month table, and the year charts.
+        if (!energyTableFits(h.toFloat(), measured.colW, measured.titleSize, measured.energySize)) {
+            drawCirclesAndCharts(canvas, cycles, w.toFloat(), h.toFloat(), count)
+            return bitmap
         }
-        fitToColumns()
-        val monthInk = textPaint(AppliancePalette.MUTED, energySize, bold = false).let { paint ->
-            maxOf(paint.measureText(lastMonth), paint.measureText(thisMonth))
-        }
-        val monthCol = monthInk + energySize * 0.5f
-        colW = ((w - monthCol) / count).coerceAtLeast(1f)
-        fitToColumns()
+        val colW = measured.colW
+        var energySize = measured.energySize
+        var titleSize = measured.titleSize
 
         val pad = (h * 0.03f).coerceAtMost(energySize * 0.35f)
         fun chrome() = pad * 2 + titleSize * 1.15f + energySize * 1.25f + energySize * 1.25f
@@ -94,6 +74,98 @@ object DonutBitmapRenderer {
         canvas.drawText(thisMonth, monthCx, row2, numberPaint)
         drawYearCharts(canvas, cycles, colW, count, row2 + energySize * 0.7f, h - pad)
         return bitmap
+    }
+
+    /** Month rows stay only when a readable donut and the year charts still fit beside them. */
+    internal fun energyTableFits(height: Float, colW: Float, titleSize: Float, energySize: Float): Boolean {
+        if (height <= 0f || colW <= 0f) return false
+        val pad = (height * 0.03f).coerceAtMost(energySize * 0.35f)
+        val minDonut = minOf(colW * 0.62f, height * 0.36f)
+        val chartFloor = maxOf(height * 0.24f, minDonut * 0.55f)
+        val chartTop = pad + titleSize * 1.27f + minDonut + energySize * 2.85f
+        return chartTop + chartFloor <= height - pad
+    }
+
+    private data class ColumnMetrics(val colW: Float, val energySize: Float, val titleSize: Float)
+
+    private fun measureColumns(
+        cycles: List<ApplianceCycle>,
+        width: Float,
+        count: Int,
+        lastMonth: String?,
+        thisMonth: String?,
+    ): ColumnMetrics {
+        // Previous drawn sizes were column * 0.315 (title) and * 0.255 (usage).
+        // 20% smaller, measured against the one-cell bitmap, is 0.204 and 0.186.
+        val baseCol = width / count.toFloat()
+        var colW = baseCol
+        var energySize = baseCol * 0.186f
+        var titleSize = baseCol * 0.204f
+        fun fitToColumns() {
+            val maxText = colW * 0.96f
+            energySize = baseCol * 0.186f
+            titleSize = baseCol * 0.204f
+            cycles.forEach { cycle ->
+                energySize = minOf(
+                    energySize,
+                    sizeThatFits(formatKwh(cycle.lastMonthWh), energySize, maxText, bold = false),
+                    sizeThatFits(formatKwh(cycle.thisMonthWh), energySize, maxText, bold = false),
+                )
+                titleSize = minOf(
+                    titleSize,
+                    sizeThatFits(cycle.role.title, titleSize, maxText, bold = true),
+                )
+            }
+        }
+        fitToColumns()
+        if (lastMonth != null && thisMonth != null) {
+            val monthInk = textPaint(AppliancePalette.MUTED, energySize, bold = false).let { paint ->
+                maxOf(paint.measureText(lastMonth), paint.measureText(thisMonth))
+            }
+            val monthCol = monthInk + energySize * 0.5f
+            colW = ((width - monthCol) / count).coerceAtLeast(1f)
+            fitToColumns()
+        }
+        return ColumnMetrics(colW, energySize, titleSize)
+    }
+
+    private fun drawCirclesAndCharts(
+        canvas: Canvas,
+        cycles: List<ApplianceCycle>,
+        width: Float,
+        height: Float,
+        count: Int,
+    ) {
+        val metrics = measureColumns(cycles, width, count, lastMonth = null, thisMonth = null)
+        val colW = metrics.colW
+        val titleSize = minOf(metrics.titleSize, height * 0.16f).coerceAtLeast(8f)
+        val pad = (height * 0.04f).coerceAtMost(titleSize * 0.45f).coerceAtLeast(2f)
+        val titleBaseline = pad + titleSize * 0.82f
+        val donutTop = titleBaseline + titleSize * 0.35f
+        val bandBottom = height - pad
+        val band = (bandBottom - donutTop).coerceAtLeast(16f)
+        val gap = (titleSize * 0.2f).coerceAtMost(band * 0.08f)
+        val targetDiameter = colW * 0.92f
+        val chartIfTarget = band - targetDiameter - gap
+        val diameter: Float
+        val chartH: Float
+        if (chartIfTarget >= band * 0.34f) {
+            diameter = targetDiameter
+            chartH = chartIfTarget
+        } else {
+            chartH = band * 0.40f
+            diameter = (band - chartH - gap).coerceAtLeast(8f)
+        }
+        val cy = donutTop + diameter / 2f
+        val chartTop = (bandBottom - chartH).coerceAtLeast(cy + diameter / 2f)
+
+        cycles.forEachIndexed { index, cycle ->
+            val cx = colW * index + colW / 2f
+            val titleColor = if (cycle.running) AppliancePalette.accent(cycle.role) else AppliancePalette.IDLE_TEXT
+            canvas.drawText(cycle.role.title, cx, titleBaseline, textPaint(titleColor, titleSize, bold = true))
+            drawDonut(canvas, cycle, cx, cy, diameter, titleSize)
+        }
+        drawYearCharts(canvas, cycles, colW, count, chartTop, bandBottom)
     }
 
     private fun drawYearCharts(
