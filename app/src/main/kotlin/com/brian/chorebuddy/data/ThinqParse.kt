@@ -43,15 +43,36 @@ fun parseDevices(text: String): List<ThinqDevice> {
 }
 
 fun parseCycle(root: JsonValue, role: ApplianceRole, zone: String): ParsedCycle {
-    val obj = root.asObj() ?: return ParsedCycle("", "", null, null)
+    val obj = cycleObject(root) ?: return ParsedCycle("", "", null, null)
     val zoned = if (zone.isNotBlank()) {
-        obj.fields.entries.firstOrNull { it.key.equals(zone, ignoreCase = true) }?.value?.asObj()
+        obj.fields.entries.firstOrNull { it.key.equals(zone, ignoreCase = true) }?.value
+            ?.let { cycleObject(it) }
     } else {
         null
     }
     val node = zoned ?: bestNode(obj, role) ?: obj
     return readNode(node)
 }
+
+/**
+ * A dedicated WashTower washer returns its state as a one-element list.
+ * A combo can list more than one tub. The main tub is the washer slot.
+ * A list with one entry is that machine, even when its location is not MAIN.
+ */
+private fun cycleObject(root: JsonValue): JsonValue.Obj? = when (root) {
+    is JsonValue.Obj -> root
+    is JsonValue.Arr -> pickListedCycle(root)
+    else -> null
+}
+
+private fun pickListedCycle(array: JsonValue.Arr): JsonValue.Obj? {
+    val objects = array.items.mapNotNull { it.asObj() }
+    if (objects.size <= 1) return objects.firstOrNull()
+    return objects.firstOrNull { locationName(it) == "MAIN" } ?: objects.first()
+}
+
+private fun locationName(node: JsonValue.Obj): String =
+    node.obj("location")?.str("locationName")?.trim()?.uppercase().orEmpty()
 
 fun lgErrorCode(body: String): String = try {
     Json.parse(body).asObj()?.obj("error")?.str("code").orEmpty()

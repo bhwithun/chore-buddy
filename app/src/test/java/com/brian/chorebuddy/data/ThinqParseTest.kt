@@ -70,6 +70,59 @@ class ThinqParseTest {
     }
 
     @Test
+    fun readsWasherWhenStateIsAList() {
+        val state = unwrapThinq(
+            """
+            {
+              "response": [
+                {
+                  "runState": { "currentState": "RUNNING" },
+                  "timer": {
+                    "remainHour": 0,
+                    "remainMinute": 36,
+                    "totalHour": 0,
+                    "totalMinute": 53
+                  },
+                  "cycle": { "cycleCount": 5 },
+                  "location": { "locationName": "MAIN" }
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+        val wash = toCycle(ApplianceRole.WASHER, "Washer", parseCycle(state, ApplianceRole.WASHER, ""), true)
+        assertTrue(wash.running)
+        assertEquals("RUNNING", wash.state)
+        assertEquals(36, wash.remainMinutes)
+        assertEquals(53, wash.totalMinutes)
+        assertEquals("36m", centerText(wash))
+    }
+
+    @Test
+    fun listedWasherPrefersTheMainTub() {
+        val state = unwrapThinq(
+            """
+            {
+              "response": [
+                {
+                  "runState": { "currentState": "POWER_OFF" },
+                  "location": { "locationName": "MINI" }
+                },
+                {
+                  "runState": { "currentState": "RUNNING" },
+                  "timer": { "remainHour": 0, "remainMinute": 12, "totalHour": 0, "totalMinute": 40 },
+                  "location": { "locationName": "MAIN" }
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+        val wash = toCycle(ApplianceRole.WASHER, "Washer", parseCycle(state, ApplianceRole.WASHER, ""), true)
+        assertTrue(wash.running)
+        assertEquals(12, wash.remainMinutes)
+    }
+
+    @Test
     fun flatDryerStateUsesTheRoot() {
         val state = unwrapThinq(
             """
