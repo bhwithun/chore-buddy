@@ -87,6 +87,10 @@ class CycleStatusTest {
         assertTrue(isRunningState("COOLING"))
         assertEquals(23f / 65f, cycleProgress(true, 42, 65), 0.001f)
         assertEquals(0f, cycleProgress(false, 42, 65), 0.001f)
+        assertEquals(0f, donutSweepDegrees(0.5f, running = false), 0.001f)
+        assertEquals(360f, donutSweepDegrees(0f, running = true), 0.001f)
+        assertEquals(0.2f * 360f, donutSweepDegrees(0.8f, running = true), 0.001f)
+        assertEquals(0.04f * 360f, donutSweepDegrees(1f, running = true), 0.001f)
         assertEquals("42m", formatRemain(42))
         assertEquals("1:05", formatRemain(65))
     }

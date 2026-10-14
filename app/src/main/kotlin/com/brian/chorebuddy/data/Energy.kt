@@ -57,6 +57,38 @@ fun monthsOfYear(year: Int, byMonth: Map<String, Int>, throughMonth: Int): List<
 fun energyMonthLabel(date: LocalDate): String =
     date.month.getDisplayName(TextStyle.SHORT, Locale.US)
 
+/**
+ * The [count] calendar months ending with [today], oldest first.
+ * Twelve months is one of each name, from last year through this month.
+ */
+fun recentEnergyMonths(today: LocalDate, count: Int = 12): List<LocalDate> {
+    val months = count.coerceIn(0, 12)
+    if (months == 0) return emptyList()
+    val end = today.withDayOfMonth(1)
+    val start = end.minusMonths((months - 1).toLong())
+    return (0 until months).map { start.plusMonths(it.toLong()) }
+}
+
+/**
+ * Watt-hours for one calendar month. Year lists win when they are present.
+ * The two stored months cover a reading that has not filled a year list yet.
+ */
+fun wattHoursForMonth(cycle: ApplianceCycle, month: LocalDate, today: LocalDate): Int? {
+    val asked = month.withDayOfMonth(1)
+    val series = when (asked.year) {
+        today.year -> cycle.thisYearWh
+        today.year - 1 -> cycle.priorYearWh
+        else -> null
+    }
+    if (series != null && asked.monthValue in 1..series.size) {
+        return series[asked.monthValue - 1]
+    }
+    val current = today.withDayOfMonth(1)
+    if (asked == current) return cycle.thisMonthWh
+    if (asked == current.minusMonths(1)) return cycle.lastMonthWh
+    return null
+}
+
 /** One decimal, no unit. Null stays a dash. Zero is "0.0". */
 fun formatKwh(wattHours: Int?): String {
     if (wattHours == null) return "—"

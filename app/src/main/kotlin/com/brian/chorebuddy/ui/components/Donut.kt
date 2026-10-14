@@ -43,7 +43,10 @@ fun ApplianceDonut(
         Text(
             text = cycle.role.title,
             color = labelColor,
-            style = titleStyle.copy(fontSize = titleStyle.fontSize * 0.8f),
+            style = titleStyle.copy(
+                fontSize = titleStyle.fontSize * 1.6f,
+                lineHeight = titleStyle.lineHeight * 1.6f,
+            ),
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

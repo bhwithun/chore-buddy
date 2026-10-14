@@ -39,6 +39,65 @@ class EnergyTest {
     }
 
     @Test
+    fun twelveMonthsRunThroughTheCurrentMonth() {
+        val today = LocalDate.of(2026, 10, 13)
+        val months = recentEnergyMonths(today)
+        assertEquals(12, months.size)
+        assertEquals(LocalDate.of(2025, 11, 1), months.first())
+        assertEquals(LocalDate.of(2026, 10, 1), months.last())
+        assertEquals(
+            listOf(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 1), LocalDate.of(2026, 10, 1)),
+            recentEnergyMonths(today, 3),
+        )
+        assertEquals(emptyList<LocalDate>(), recentEnergyMonths(today, 0))
+
+        val january = recentEnergyMonths(LocalDate.of(2026, 1, 2))
+        assertEquals(LocalDate.of(2025, 2, 1), january.first())
+        assertEquals(LocalDate.of(2026, 1, 1), january.last())
+    }
+
+    @Test
+    fun monthWattHoursComeFromTheYearLists() {
+        val today = LocalDate.of(2026, 10, 13)
+        val cycle = ApplianceCycle(
+            role = ApplianceRole.WASHER,
+            alias = "Washer",
+            state = "POWER_OFF",
+            course = "",
+            running = false,
+            progress = 0f,
+            remainMinutes = null,
+            linked = true,
+            lastMonthWh = 1,
+            thisMonthWh = 2,
+            thisYearWh = (1..12).map { it * 10 },
+            priorYearWh = (1..12).map { it * 100 },
+        )
+        assertEquals(1100, wattHoursForMonth(cycle, LocalDate.of(2025, 11, 1), today))
+        assertEquals(100, wattHoursForMonth(cycle, LocalDate.of(2026, 10, 8), today))
+    }
+
+    @Test
+    fun aMissingYearListUsesTheTwoStoredMonths() {
+        val today = LocalDate.of(2026, 10, 13)
+        val cycle = ApplianceCycle(
+            role = ApplianceRole.WASHER,
+            alias = "Washer",
+            state = "POWER_OFF",
+            course = "",
+            running = false,
+            progress = 0f,
+            remainMinutes = null,
+            linked = true,
+            lastMonthWh = 5,
+            thisMonthWh = 9,
+        )
+        assertEquals(9, wattHoursForMonth(cycle, LocalDate.of(2026, 10, 1), today))
+        assertEquals(5, wattHoursForMonth(cycle, LocalDate.of(2026, 9, 1), today))
+        assertEquals(null, wattHoursForMonth(cycle, LocalDate.of(2026, 8, 1), today))
+    }
+
+    @Test
     fun anEmptyMonthIsZero() {
         val body = """{"response":{"result":{"property":["energyUsage"],"dataList":[]}}}"""
         assertEquals(0, parseEnergyWattHours(body, "energyUsage"))

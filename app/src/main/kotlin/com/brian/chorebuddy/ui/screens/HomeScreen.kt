@@ -2,6 +2,8 @@ package com.brian.chorebuddy.ui.screens
 
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +33,8 @@ import com.brian.chorebuddy.data.ApplianceCycle
 import com.brian.chorebuddy.data.detailText
 import com.brian.chorebuddy.data.energyMonthLabel
 import com.brian.chorebuddy.data.formatKwh
+import com.brian.chorebuddy.data.recentEnergyMonths
+import com.brian.chorebuddy.data.wattHoursForMonth
 import com.brian.chorebuddy.ui.components.ApplianceDonut
 import com.brian.chorebuddy.ui.theme.AppliancePalette
 import com.brian.chorebuddy.viewmodel.HomeViewModel
@@ -51,12 +55,13 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Chore Buddy", style = MaterialTheme.typography.headlineMedium)
         Text(
-            text = "Washer, dryer, and dishwasher. A full ring is a finished cycle. Gray means that machine is off.",
+            text = "Washer, dryer, and dishwasher. The ring is the time still left. Gray means that machine is off.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -76,9 +81,12 @@ fun HomeScreen(
 
         val cycles = snapshot.cycles()
         val today = LocalDate.now()
-        val monthWidth = 40.dp
+        val monthWidth = 72.dp
         val usageStyle = MaterialTheme.typography.bodySmall.let { style ->
-            style.copy(fontSize = style.fontSize * 0.8f)
+            style.copy(
+                fontSize = style.fontSize * 1.6f,
+                lineHeight = style.lineHeight * 1.6f,
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -90,20 +98,6 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.width(monthWidth))
             }
-            EnergyRow(
-                cycles = cycles,
-                month = energyMonthLabel(today.withDayOfMonth(1).minusMonths(1)),
-                monthWidth = monthWidth,
-                style = usageStyle,
-                value = { it.lastMonthWh },
-            )
-            EnergyRow(
-                cycles = cycles,
-                month = energyMonthLabel(today),
-                monthWidth = monthWidth,
-                style = usageStyle,
-                value = { it.thisMonthWh },
-            )
             Row(modifier = Modifier.fillMaxWidth()) {
                 cycles.forEach { cycle ->
                     Text(
@@ -121,6 +115,15 @@ fun HomeScreen(
                     )
                 }
                 Spacer(Modifier.width(monthWidth))
+            }
+            recentEnergyMonths(today).forEach { month ->
+                EnergyRow(
+                    cycles = cycles,
+                    month = energyMonthLabel(month),
+                    monthWidth = monthWidth,
+                    style = usageStyle,
+                    value = { wattHoursForMonth(it, month, today) },
+                )
             }
         }
 

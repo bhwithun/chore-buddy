@@ -81,10 +81,15 @@ fun cycleProgress(running: Boolean, remainMinutes: Int?, totalMinutes: Int?): Fl
     return (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }
 
-/** Sweep used by both the widget bitmap and the in-app donut. */
+/**
+ * Sweep used by both the widget bitmap and the in-app donut.
+ * [progress] is elapsed time, so the arc is what is left. A new cycle is a
+ * full ring and the ring shrinks as the remaining time runs out.
+ */
 fun donutSweepDegrees(progress: Float, running: Boolean): Float {
     if (!running) return 0f
-    val shown = progress.coerceIn(0f, 1f).let { if (it <= 0f) 0.04f else it }
+    val remaining = (1f - progress.coerceIn(0f, 1f)).coerceIn(0f, 1f)
+    val shown = if (remaining <= 0f) 0.04f else remaining
     return shown * 360f
 }
 
